@@ -52,8 +52,21 @@ class Chef
         as_hash["type"]   = new_resource.class.dsl_name
         as_hash["name"]   = new_resource.name
         as_hash["id"]     = new_resource.identity
-        as_hash["after"]  = state(new_resource)
-        as_hash["before"] = current_resource ? state(current_resource) : {}
+
+        as_hash["after"]  = new_resource.state
+        as_hash["before"] = current_resource ? current_resource.state : {}
+        # Due to CHEF-4615, a resource can define an attribute called 'state'
+        # which overrides the state method that computes the hash of
+        # state attributes. Here we just return empty state attributes if
+        # the resource has overridden them and they are set
+        unless new_resource.method(:state).owner == Chef::Resource
+          if as_hash["after"] != {} || as_hash["before"] != {}
+            Log.warn("Chef::Resource#state is overridden in Resource #{new_resource.class.dsl_name}.  Skipping state attributes")
+            as_hash["after"]  = {}
+            as_hash["before"] = {}
+          end
+        end
+
         as_hash["duration"] = (elapsed_time * 1000).to_i.to_s
         as_hash["delta"]  = new_resource.diff if new_resource.respond_to?("diff")
         as_hash["delta"]  = "" if as_hash["delta"].nil?
@@ -79,15 +92,6 @@ class Chef
       def success?
         !self.exception
       end
-
-      def state(resource)
-        if resource.state.instance_of?(Hash)
-          resource.state
-        else
-          {}
-        end
-      end
-
     end # End class ResouceReport
 
     attr_reader :updated_resources
