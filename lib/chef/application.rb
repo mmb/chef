@@ -79,26 +79,18 @@ class Chef::Application
       return
     end
 
-    begin
-      case config[:config_file]
-      when /^(http|https):\/\//
-        Chef::REST.new("", nil, nil).fetch(config[:config_file]) { |f| apply_config(f.path) }
-      else
-        ::File::open(config[:config_file]) { |f| apply_config(f.path) }
-      end
-    rescue Errno::ENOENT => error
+    config_fetcher = Chef::ConfigFetcher.new(config[:config_file])
+    if config[:config_file].nil?
+      Chef::Application.fatal!("No config file defined", 2)
+    elsif config_fetcher.config_missing?
       Chef::Log.warn("*****************************************")
       Chef::Log.warn("Did not find config file: #{config[:config_file]}, using command line options.")
       Chef::Log.warn("*****************************************")
-
-      Chef::Config.merge!(config)
-    rescue SocketError => error
-      Chef::Application.fatal!("Error getting config file #{config[:config_file]}", 2)
-    rescue Chef::Exceptions::ConfigurationError => error
-      Chef::Application.fatal!("Error processing config file #{config[:config_file]} with error #{error.message}", 2)
-    rescue Exception => error
-      Chef::Application.fatal!("Unknown error processing config file #{config[:config_file]} with error #{error.message}", 2)
+    else
+      config_content = config_fetcher.read_config
+      apply_config(config_content, config[:config_file])
     end
+    Chef::Config.merge!(config)
   end
 
   # Initialize and configure the logger.
@@ -223,9 +215,13 @@ class Chef::Application
 
   private
 
-  def apply_config(config_file_path)
-    Chef::Config.from_file(config_file_path)
+  def apply_config(config_content, config_file_path)
+    Chef::Config.from_string(config_content, config_file_path)
     Chef::Config.merge!(config)
+  rescue Chef::Exceptions::ConfigurationError => error
+    Chef::Application.fatal!("Error processing config file #{config[:config_file]} with error #{error.message}", 2)
+  rescue Exception => error
+    Chef::Application.fatal!("Unknown error processing config file #{config[:config_file]} with error #{error.message}", 2)
   end
 
   class << self

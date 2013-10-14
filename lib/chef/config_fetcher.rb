@@ -27,7 +27,7 @@ class Chef
 
     def fetch_remote_config
       http.get("")
-    rescue SocketError, SystemCallError => error
+    rescue SocketError, SystemCallError, Net::HTTPServerException => error
       Chef::Application.fatal!("Cannot fetch config '#{config_location}': '#{error.class}: #{error.message}", 2)
     end
 
@@ -37,6 +37,10 @@ class Chef
       Chef::Application.fatal!("Cannot load configuration from #{config_location}", 2)
     rescue Errno::EACCES => error
       Chef::Application.fatal!("Permissions are incorrect on #{config_location}. Please chmod a+r #{config_location}", 2)
+    end
+
+    def config_missing?
+      !remote_config? and !::File.exist?(config_location)
     end
 
     def http
