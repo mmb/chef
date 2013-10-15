@@ -19,30 +19,39 @@ EOM
       result.error!
     end
 
-    it 'should complete with success when cwd is just above cookbooks and paths are not specified' do
-      chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
-      result = shell_out("#{chef_dir}/chef-client -z -o 'x::default'", :cwd => path_to(''))
-      result.error!
+    context 'and an empty config file' do
+      before :each do
+        file 'empty-knife.rb', ''
+      end
+
+      it 'should complete with success when cwd is just above cookbooks and paths are not specified' do
+        chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
+        result = shell_out("#{chef_dir}/chef-client -z -o 'x::default' -c \"#{path_to('empty-knife.rb')}\"", :cwd => path_to(''))
+        result.error!
+      end
+
+      it 'should complete with success when cwd is below cookbooks and paths are not specified' do
+        chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
+        result = shell_out("#{chef_dir}/chef-client -z -o 'x::default' -c \"#{path_to('empty-knife.rb')}\"", :cwd => path_to('cookbooks/x'))
+        result.error!
+      end
+
+      it 'should fail when cwd is below high above and paths are not specified' do
+        chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
+        result = shell_out("#{chef_dir}/chef-client -z -o 'x::default' -c \"#{path_to('empty-knife.rb')}\"", :cwd => File.expand_path('..', path_to('')))
+        result.exitstatus.should == 1
+      end
     end
 
-    it 'should complete with success when cwd is below cookbooks and paths are not specified' do
-      chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
-      result = shell_out("#{chef_dir}/chef-client -z -o 'x::default'", :cwd => path_to('cookbooks/x'))
-      result.error!
-    end
-
-    it 'should fail when cwd is below high above and paths are not specified' do
-      chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
-      result = shell_out("#{chef_dir}/chef-client -z -o 'x::default'", :cwd => File.expand_path('..', path_to('')))
-      result.exitstatus.should == 1
-    end
-
-    it 'should load .chef/knife.rb when -z is specified' do
-      file '.chef/knife.rb', 'xxx.xxx'
-      chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
-      result = shell_out("#{chef_dir}/chef-client -z -o 'x::default'", :cwd => path_to(''))
-      result.exitstatus.should == 2
-    end
+    # This is disabled until we run chef-client internally (rather than shelling out) because there is
+    # a dangerous chance it will load a user's knife.rb.  When we fix this, we also need to run tests
+    # for "and there is no config file."
+#    it 'should load .chef/knife.rb when -z is specified' do
+#      file '.chef/knife.rb', 'xxx.xxx'
+#      chef_dir = File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "bin"))
+#      result = shell_out("#{chef_dir}/chef-client -z -o 'x::default'", :cwd => path_to(''))
+#      result.exitstatus.should == 2
+#    end
 
     it "should complete with success" do
       file 'config/client.rb', <<EOM
